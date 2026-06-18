@@ -1,8 +1,7 @@
 <template>
-  <div class="borrow-list">
-    <h2 class="page-title">借阅管理</h2>
+  <div class="reservation-list">
+    <h2 class="page-title animate-fade-in">预约管理</h2>
 
-    <!-- 统计卡片 - 丰富内容 -->
     <a-row :gutter="[16, 16]" class="stat-row">
       <a-col :xs="12" :sm="12" :md="6">
         <div class="stat-card-rich total">
@@ -10,97 +9,81 @@
             <div class="stat-card-icon">
               <DatabaseOutlined />
             </div>
-            <div class="stat-card-trend up">
-              <RiseOutlined />
-              <span>{{ todayBorrowCount }}</span>
-            </div>
           </div>
           <div class="stat-card-body">
-            <div class="stat-card-value">{{ borrowStore.records.length }}</div>
-            <div class="stat-card-label">总记录</div>
+            <div class="stat-card-value">{{ reservationStore.totalReservations }}</div>
+            <div class="stat-card-label">总预约</div>
           </div>
           <div class="stat-card-footer">
-            <span>今日新增 {{ todayBorrowCount }} 条</span>
+            <span>累计预约记录</span>
           </div>
         </div>
       </a-col>
       <a-col :xs="12" :sm="12" :md="6">
-        <div class="stat-card-rich borrowed">
+        <div class="stat-card-rich waiting">
           <div class="stat-card-header">
             <div class="stat-card-icon">
-              <BookOutlined />
-            </div>
-            <div class="stat-card-badge">
               <ClockCircleOutlined />
             </div>
-          </div>
-          <div class="stat-card-body">
-            <div class="stat-card-value">{{ borrowStore.totalBorrowed }}</div>
-            <div class="stat-card-label">借阅中</div>
-          </div>
-          <div class="stat-card-footer">
-            <a-progress
-              :percent="borrowedPercent"
-              :show-info="false"
-              stroke-color="#1890ff"
-              size="small"
-            />
-            <span>占比 {{ borrowedPercent }}%</span>
-          </div>
-        </div>
-      </a-col>
-      <a-col :xs="12" :sm="12" :md="6">
-        <div class="stat-card-rich returned">
-          <div class="stat-card-header">
-            <div class="stat-card-icon">
-              <CheckCircleOutlined />
-            </div>
-            <div class="stat-card-badge success">
-              <SmileOutlined />
-            </div>
-          </div>
-          <div class="stat-card-body">
-            <div class="stat-card-value">{{ returnedCount }}</div>
-            <div class="stat-card-label">已归还</div>
-          </div>
-          <div class="stat-card-footer">
-            <a-progress
-              :percent="returnedPercent"
-              :show-info="false"
-              stroke-color="#52c41a"
-              size="small"
-            />
-            <span>归还率 {{ returnedPercent }}%</span>
-          </div>
-        </div>
-      </a-col>
-      <a-col :xs="12" :sm="12" :md="6">
-        <div class="stat-card-rich overdue">
-          <div class="stat-card-header">
-            <div class="stat-card-icon">
-              <ExclamationCircleOutlined />
-            </div>
-            <div class="stat-card-badge warning" v-if="borrowStore.totalOverdue > 0">
+            <div class="stat-card-badge warning" v-if="reservationStore.totalWaiting > 0">
               <WarningOutlined />
             </div>
           </div>
           <div class="stat-card-body">
-            <div class="stat-card-value">{{ borrowStore.totalOverdue }}</div>
-            <div class="stat-card-label">已逾期</div>
+            <div class="stat-card-value">{{ reservationStore.totalWaiting }}</div>
+            <div class="stat-card-label">等待中</div>
           </div>
           <div class="stat-card-footer">
-            <span v-if="borrowStore.totalOverdue > 0" class="warning-text">
-              <AlertOutlined /> 请及时处理
-            </span>
-            <span v-else class="success-text">
-              <CheckOutlined /> 暂无逾期
-            </span>
+            <a-progress
+              :percent="waitingPercent"
+              :show-info="false"
+              stroke-color="#faad14"
+              size="small"
+            />
+            <span>占比 {{ waitingPercent }}%</span>
+          </div>
+        </div>
+      </a-col>
+      <a-col :xs="12" :sm="12" :md="6">
+        <div class="stat-card-rich fulfilled">
+          <div class="stat-card-header">
+            <div class="stat-card-icon">
+              <CheckCircleOutlined />
+            </div>
+          </div>
+          <div class="stat-card-body">
+            <div class="stat-card-value">{{ fulfilledCount }}</div>
+            <div class="stat-card-label">已完成</div>
+          </div>
+          <div class="stat-card-footer">
+            <a-progress
+              :percent="fulfilledPercent"
+              :show-info="false"
+              stroke-color="#52c41a"
+              size="small"
+            />
+            <span>完成率 {{ fulfilledPercent }}%</span>
+          </div>
+        </div>
+      </a-col>
+      <a-col :xs="12" :sm="12" :md="6">
+        <div class="stat-card-rich cancelled">
+          <div class="stat-card-header">
+            <div class="stat-card-icon">
+              <CloseCircleOutlined />
+            </div>
+          </div>
+          <div class="stat-card-body">
+            <div class="stat-card-value">{{ cancelledCount }}</div>
+            <div class="stat-card-label">已取消</div>
+          </div>
+          <div class="stat-card-footer">
+            <span>取消预约记录</span>
           </div>
         </div>
       </a-col>
     </a-row>
 
-    <!-- 搜索区域 -->
     <div class="search-area animate-slide-down">
       <a-row :gutter="16" align="middle">
         <a-col :xs="24" :sm="12" :md="8" :lg="6">
@@ -128,23 +111,22 @@
             style="width: 100%"
             @change="handleStatusChange"
           >
-            <a-select-option value="borrowed">借阅中</a-select-option>
-            <a-select-option value="returned">已归还</a-select-option>
-            <a-select-option value="overdue">已逾期</a-select-option>
+            <a-select-option value="waiting">等待中</a-select-option>
+            <a-select-option value="fulfilled">已完成</a-select-option>
+            <a-select-option value="cancelled">已取消</a-select-option>
           </a-select>
         </a-col>
         <a-col :xs="24" :sm="24" :md="8" :lg="12" style="text-align: right;">
-          <a-button type="primary" @click="showBorrowModal" class="add-btn">
-            <PlusOutlined /> 新增借阅
+          <a-button type="primary" @click="showReserveModal" class="add-btn">
+            <PlusOutlined /> 新增预约
           </a-button>
         </a-col>
       </a-row>
       
-      <!-- 搜索结果提示 -->
       <transition name="fade-slide">
         <div v-if="searchKeyword || selectedStatus" class="search-result-tip">
           <span class="result-count">
-            找到 <strong>{{ filteredRecords.length }}</strong> 条结果
+            找到 <strong>{{ filteredReservations.length }}</strong> 条结果
           </span>
           <a-button type="link" size="small" @click="clearFilters" class="clear-btn">
             清除筛选
@@ -153,9 +135,7 @@
       </transition>
     </div>
 
-    <!-- 借阅表格 -->
     <div :class="['table-container', 'animate-fade-in', { 'table-loading': tableAnimating }]">
-      <!-- 加载动画遮罩 -->
       <transition name="fade">
         <div v-if="tableAnimating" class="table-loading-overlay">
           <div class="loading-spinner">
@@ -167,7 +147,7 @@
       
       <a-table
         :columns="columns"
-        :data-source="filteredRecords"
+        :data-source="filteredReservations"
         :loading="loading"
         row-key="id"
         :pagination="{ pageSize: 10, showTotal: total => `共 ${total} 条` }"
@@ -186,6 +166,13 @@
               <div class="text-secondary">{{ record.isbn }}</div>
             </div>
           </template>
+          <template v-else-if="column.key === 'queuePosition'">
+            <div v-if="record.status === 'waiting'" class="queue-position">
+              <span class="queue-number">{{ record.queuePosition }}</span>
+              <span class="queue-label">位</span>
+            </div>
+            <span v-else class="text-secondary">-</span>
+          </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="getStatusColor(record.status)" :class="['status-tag', record.status]">
               {{ getStatusText(record.status) }}
@@ -194,25 +181,18 @@
           <template v-else-if="column.key === 'action'">
             <a-space>
               <a-button
-                v-if="record.status === 'borrowed' || record.status === 'overdue'"
+                v-if="record.status === 'waiting'"
                 type="link"
                 size="small"
-                class="table-action-btn return-btn"
-                @click="handleReturn(record)"
+                class="table-action-btn cancel-btn"
+                @click="handleCancel(record)"
               >
-                <CheckOutlined /> 归还
+                <CloseOutlined /> 取消预约
               </a-button>
-              <a-button
-                v-if="record.status === 'borrowed' && record.renewCount < 2"
-                type="link"
-                size="small"
-                class="table-action-btn renew-btn"
-                @click="handleRenew(record)"
-              >
-                <ReloadOutlined /> 续借
-              </a-button>
-              <span v-if="record.status === 'returned'" class="completed-text">
-                <CheckCircleOutlined /> 已完成
+              <span v-else class="completed-text">
+                <CheckCircleOutlined v-if="record.status === 'fulfilled'" />
+                <CloseCircleOutlined v-else />
+                {{ record.status === 'fulfilled' ? '已完成' : '已取消' }}
               </span>
             </a-space>
           </template>
@@ -220,25 +200,24 @@
       </a-table>
     </div>
 
-    <!-- 新增借阅弹窗 -->
     <a-modal
-      v-model:open="borrowModalVisible"
-      title="新增借阅"
+      v-model:open="reserveModalVisible"
+      title="新增预约"
       :confirm-loading="submitLoading"
-      @ok="handleBorrowSubmit"
+      @ok="handleReserveSubmit"
       @cancel="handleModalClose"
       width="500px"
     >
       <a-form
-        ref="borrowFormRef"
-        :model="borrowForm"
-        :rules="borrowRules"
+        ref="reserveFormRef"
+        :model="reserveForm"
+        :rules="reserveRules"
         :label-col="{ span: 5 }"
         :wrapper-col="{ span: 18 }"
       >
         <a-form-item label="读者" name="readerId">
           <a-select
-            v-model:value="borrowForm.readerId"
+            v-model:value="reserveForm.readerId"
             placeholder="请选择读者"
             show-search
             :filter-option="filterReader"
@@ -255,18 +234,18 @@
         </a-form-item>
         <a-form-item label="图书" name="bookId">
           <a-select
-            v-model:value="borrowForm.bookId"
+            v-model:value="reserveForm.bookId"
             placeholder="请选择图书"
             show-search
             :filter-option="filterBook"
           >
             <a-select-option
-              v-for="book in availableBooks"
+              v-for="book in reservableBooks"
               :key="book.id"
               :value="book.id"
               :label="book.title"
             >
-              {{ book.title }} (库存: {{ book.available }})
+              {{ book.title }} (库存: {{ book.available }}，预约: {{ getWaitCount(book.id) }})
             </a-select-option>
           </a-select>
         </a-form-item>
@@ -280,35 +259,28 @@ import { ref, reactive, computed, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
 import {
   PlusOutlined,
-  CheckOutlined,
-  ReloadOutlined,
-  DatabaseOutlined,
-  BookOutlined,
+  CloseOutlined,
   CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  RiseOutlined,
+  CloseCircleOutlined,
+  DatabaseOutlined,
   ClockCircleOutlined,
-  SmileOutlined,
   WarningOutlined,
-  AlertOutlined,
   SearchOutlined
 } from '@ant-design/icons-vue'
-import { useBorrowStore } from '@/stores/borrow'
+import { useReservationStore } from '@/stores/reservation'
 import { useReaderStore } from '@/stores/reader'
 import { useBookStore } from '@/stores/book'
-import { useReservationStore } from '@/stores/reservation'
 
-const borrowStore = useBorrowStore()
+const reservationStore = useReservationStore()
 const readerStore = useReaderStore()
 const bookStore = useBookStore()
-const reservationStore = useReservationStore()
 
 const loading = ref(false)
 const searchKeyword = ref('')
 const selectedStatus = ref(null)
-const borrowModalVisible = ref(false)
+const reserveModalVisible = ref(false)
 const submitLoading = ref(false)
-const borrowFormRef = ref(null)
+const reserveFormRef = ref(null)
 const isSearching = ref(false)
 const tableAnimating = ref(false)
 let searchTimeout = null
@@ -316,47 +288,45 @@ let searchTimeout = null
 const columns = [
   { title: '读者信息', key: 'reader', width: 160 },
   { title: '图书信息', key: 'book', width: 200 },
-  { title: '借阅日期', dataIndex: 'borrowDate', key: 'borrowDate', width: 110 },
-  { title: '应还日期', dataIndex: 'dueDate', key: 'dueDate', width: 110 },
-  { title: '归还日期', dataIndex: 'returnDate', key: 'returnDate', width: 110 },
-  { title: '续借次数', dataIndex: 'renewCount', key: 'renewCount', width: 90 },
+  { title: '预约日期', dataIndex: 'reserveDate', key: 'reserveDate', width: 110 },
+  { title: '队列位置', key: 'queuePosition', width: 90 },
+  { title: '完成日期', dataIndex: 'fulfillDate', key: 'fulfillDate', width: 110 },
   { title: '状态', key: 'status', width: 90 },
-  { title: '操作', key: 'action', width: 140, fixed: 'right' }
+  { title: '操作', key: 'action', width: 130, fixed: 'right' }
 ]
 
-const borrowForm = reactive({
+const reserveForm = reactive({
   readerId: null,
   bookId: null
 })
 
-const borrowRules = {
+const reserveRules = {
   readerId: [{ required: true, message: '请选择读者' }],
   bookId: [{ required: true, message: '请选择图书' }]
 }
 
-const returnedCount = computed(() => {
-  return borrowStore.records.filter(r => r.status === 'returned').length
+const fulfilledCount = computed(() => {
+  return reservationStore.reservations.filter(r => r.status === 'fulfilled').length
 })
 
-const todayBorrowCount = computed(() => {
-  const today = new Date().toISOString().split('T')[0]
-  return borrowStore.records.filter(r => r.borrowDate === today).length
+const cancelledCount = computed(() => {
+  return reservationStore.reservations.filter(r => r.status === 'cancelled').length
 })
 
-const borrowedPercent = computed(() => {
-  const total = borrowStore.records.length
+const waitingPercent = computed(() => {
+  const total = reservationStore.reservations.length
   if (total === 0) return 0
-  return Math.round((borrowStore.totalBorrowed / total) * 100)
+  return Math.round((reservationStore.totalWaiting / total) * 100)
 })
 
-const returnedPercent = computed(() => {
-  const total = borrowStore.records.length
+const fulfilledPercent = computed(() => {
+  const total = reservationStore.reservations.length
   if (total === 0) return 0
-  return Math.round((returnedCount.value / total) * 100)
+  return Math.round((fulfilledCount.value / total) * 100)
 })
 
-const filteredRecords = computed(() => {
-  let result = borrowStore.records
+const filteredReservations = computed(() => {
+  let result = reservationStore.reservations
 
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase()
@@ -375,29 +345,31 @@ const filteredRecords = computed(() => {
 })
 
 const availableReaders = computed(() => {
-  return readerStore.readers.filter(r =>
-    r.status === 'active' && r.borrowCount < r.maxBorrow
-  )
+  return readerStore.readers.filter(r => r.status === 'active')
 })
 
-const availableBooks = computed(() => {
-  return bookStore.books.filter(b => b.available > 0)
+const reservableBooks = computed(() => {
+  return bookStore.books
 })
+
+function getWaitCount(bookId) {
+  return reservationStore.getWaitingReservationsByBook(bookId).length
+}
 
 function getStatusColor(status) {
   const colors = {
-    borrowed: 'processing',
-    returned: 'success',
-    overdue: 'error'
+    waiting: 'warning',
+    fulfilled: 'success',
+    cancelled: 'default'
   }
   return colors[status] || 'default'
 }
 
 function getStatusText(status) {
   const texts = {
-    borrowed: '借阅中',
-    returned: '已归还',
-    overdue: '已逾期'
+    waiting: '等待中',
+    fulfilled: '已完成',
+    cancelled: '已取消'
   }
   return texts[status] || status
 }
@@ -414,7 +386,6 @@ function handleStatusChange() {
   triggerSearchAnimation()
 }
 
-// 搜索输入时的动画效果
 function onSearchInput() {
   isSearching.value = true
   
@@ -428,7 +399,6 @@ function onSearchInput() {
   }, 300)
 }
 
-// 触发表格搜索动画和loading
 function triggerSearchAnimation() {
   loading.value = true
   tableAnimating.value = true
@@ -438,49 +408,52 @@ function triggerSearchAnimation() {
   }, 600)
 }
 
-// 清除筛选
 function clearFilters() {
   searchKeyword.value = ''
   selectedStatus.value = null
   triggerSearchAnimation()
 }
 
-// 获取行样式类名
 function getRowClassName(record, index) {
   return `table-row-animate row-${index}`
 }
 
 function handleModalClose() {
   nextTick(() => {
-    borrowFormRef.value?.resetFields()
+    reserveFormRef.value?.resetFields()
   })
 }
 
-function showBorrowModal() {
-  borrowForm.readerId = null
-  borrowForm.bookId = null
-  borrowModalVisible.value = true
+function showReserveModal() {
+  reserveForm.readerId = null
+  reserveForm.bookId = null
+  reserveModalVisible.value = true
   nextTick(() => {
-    borrowFormRef.value?.clearValidate()
+    reserveFormRef.value?.clearValidate()
   })
 }
 
-async function handleBorrowSubmit() {
+async function handleReserveSubmit() {
   try {
-    await borrowFormRef.value.validate()
+    await reserveFormRef.value.validate()
     submitLoading.value = true
 
-    const reader = readerStore.getReaderById(borrowForm.readerId)
-    const book = bookStore.getBookById(borrowForm.bookId)
+    const reader = readerStore.getReaderById(reserveForm.readerId)
+    const book = bookStore.getBookById(reserveForm.bookId)
 
     if (!reader || !book) {
       message.error('读者或图书信息不存在')
       return
     }
 
+    if (reservationStore.hasReaderReserved(book.id, reader.id)) {
+      message.error('该读者已预约过此书')
+      return
+    }
+
     await new Promise(resolve => setTimeout(resolve, 500))
 
-    borrowStore.addRecord({
+    reservationStore.addReservation({
       readerId: reader.id,
       readerName: reader.name,
       cardNo: reader.cardNo,
@@ -489,11 +462,8 @@ async function handleBorrowSubmit() {
       isbn: book.isbn
     })
 
-    bookStore.updateBook(book.id, { available: book.available - 1 })
-    readerStore.updateReader(reader.id, { borrowCount: reader.borrowCount + 1 })
-
-    message.success('借阅成功')
-    borrowModalVisible.value = false
+    message.success('预约成功')
+    reserveModalVisible.value = false
   } catch (error) {
     console.error('表单验证失败:', error)
   } finally {
@@ -501,54 +471,14 @@ async function handleBorrowSubmit() {
   }
 }
 
-function handleReturn(record) {
-  borrowStore.returnBook(record.id)
-
-  const book = bookStore.getBookById(record.bookId)
-  const reader = readerStore.getReaderById(record.readerId)
-
-  if (book) {
-    bookStore.updateBook(book.id, { available: book.available + 1 })
-  }
-  if (reader) {
-    readerStore.updateReader(reader.id, { borrowCount: Math.max(0, reader.borrowCount - 1) })
-  }
-
-  const firstReservation = reservationStore.getFirstWaitingReservation(record.bookId)
-  if (firstReservation && book && book.available > 0) {
-    const reserveReader = readerStore.getReaderById(firstReservation.readerId)
-    if (reserveReader && reserveReader.status === 'active' && reserveReader.borrowCount < reserveReader.maxBorrow) {
-      borrowStore.addRecord({
-        readerId: reserveReader.id,
-        readerName: reserveReader.name,
-        cardNo: reserveReader.cardNo,
-        bookId: book.id,
-        bookTitle: book.title,
-        isbn: book.isbn
-      })
-      bookStore.updateBook(book.id, { available: book.available - 1 })
-      readerStore.updateReader(reserveReader.id, { borrowCount: reserveReader.borrowCount + 1 })
-      reservationStore.fulfillReservation(firstReservation.id)
-      message.success(`归还成功，已自动分配给预约读者：${reserveReader.name}`)
-      return
-    }
-  }
-
-  message.success('归还成功')
-}
-
-function handleRenew(record) {
-  const success = borrowStore.renewBook(record.id)
-  if (success) {
-    message.success('续借成功，借阅期限延长15天')
-  } else {
-    message.error('续借失败，已达到最大续借次数')
-  }
+function handleCancel(record) {
+  reservationStore.cancelReservation(record.id)
+  message.success('预约已取消')
 }
 </script>
 
 <style lang="less" scoped>
-.borrow-list {
+.reservation-list {
   .page-title {
     font-size: 20px;
     font-weight: 600;
@@ -581,22 +511,22 @@ function handleRenew(record) {
     .stat-card-value { color: #667eea; }
   }
 
-  &.borrowed {
-    border-left-color: #1890ff;
-    .stat-card-icon { background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%); }
-    .stat-card-value { color: #1890ff; }
+  &.waiting {
+    border-left-color: #faad14;
+    .stat-card-icon { background: linear-gradient(135deg, #faad14 0%, #ffc53d 100%); }
+    .stat-card-value { color: #faad14; }
   }
 
-  &.returned {
+  &.fulfilled {
     border-left-color: #52c41a;
     .stat-card-icon { background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%); }
     .stat-card-value { color: #52c41a; }
   }
 
-  &.overdue {
-    border-left-color: #ff4d4f;
-    .stat-card-icon { background: linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%); }
-    .stat-card-value { color: #ff4d4f; }
+  &.cancelled {
+    border-left-color: #8c8c8c;
+    .stat-card-icon { background: linear-gradient(135deg, #8c8c8c 0%, #bfbfbf 100%); }
+    .stat-card-value { color: #8c8c8c; }
   }
 
   .stat-card-header {
@@ -616,20 +546,6 @@ function handleRenew(record) {
       color: #fff;
     }
 
-    .stat-card-trend {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
-      padding: 4px 8px;
-      border-radius: 12px;
-
-      &.up {
-        background: #f6ffed;
-        color: #52c41a;
-      }
-    }
-
     .stat-card-badge {
       width: 28px;
       height: 28px;
@@ -641,14 +557,9 @@ function handleRenew(record) {
       background: #e6f7ff;
       color: #1890ff;
 
-      &.success {
-        background: #f6ffed;
-        color: #52c41a;
-      }
-
       &.warning {
-        background: #fff2e8;
-        color: #fa541c;
+        background: #fff7e6;
+        color: #faad14;
         animation: pulse 1.5s infinite;
       }
     }
@@ -679,20 +590,6 @@ function handleRenew(record) {
     :deep(.ant-progress) {
       margin-bottom: 4px;
     }
-
-    .warning-text {
-      color: #fa541c;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .success-text {
-      color: #52c41a;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
   }
 }
 
@@ -701,9 +598,6 @@ function handleRenew(record) {
   50% { opacity: 0.5; }
 }
 
-// ========================================
-// 动画定义
-// ========================================
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -720,30 +614,11 @@ function handleRenew(record) {
   }
 }
 
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.2); }
-}
-
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-@keyframes rowFadeIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-// ========================================
-// 动画类
-// ========================================
 .animate-fade-in {
   animation: fadeIn 0.5s ease-out both;
 }
@@ -752,9 +627,6 @@ function handleRenew(record) {
   animation: slideDown 0.5s ease-out both;
 }
 
-// ========================================
-// 过渡动画
-// ========================================
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;
@@ -908,7 +780,6 @@ function handleRenew(record) {
     }
   }
 
-  // 表格行样式
   :deep(.ant-table-tbody) {
     .ant-table-row {
       &:hover td {
@@ -923,10 +794,9 @@ function handleRenew(record) {
     border-radius: 4px;
     transition: all 0.2s ease;
 
-    &.return-btn:hover,
-    &.renew-btn:hover {
-      color: #1890ff;
-      background: #e6f7ff;
+    &.cancel-btn:hover {
+      color: #ff4d4f;
+      background: #fff1f0;
     }
   }
   
@@ -939,9 +809,25 @@ function handleRenew(record) {
   }
 }
 
+.queue-position {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+
+  .queue-number {
+    font-size: 18px;
+    font-weight: 600;
+    color: #faad14;
+  }
+
+  .queue-label {
+    font-size: 12px;
+    color: #999;
+  }
+}
+
 .reader-cell,
 .book-cell {
-  // 保持默认样式
 }
 
 .text-primary {
@@ -955,6 +841,5 @@ function handleRenew(record) {
 }
 
 .status-tag {
-  // 保持默认样式
 }
 </style>
