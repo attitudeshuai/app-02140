@@ -41,6 +41,12 @@ const routes = [
         name: 'Categories',
         component: () => import('@/views/categories/CategoryList.vue'),
         meta: { title: '分类管理', icon: 'AppstoreOutlined' }
+      },
+      {
+        path: 'reservations',
+        name: 'Reservations',
+        component: () => import('@/views/reservations/ReservationList.vue'),
+        meta: { title: '预约管理', icon: 'BellOutlined' }
       }
     ]
   },
