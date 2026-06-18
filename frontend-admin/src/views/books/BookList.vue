@@ -116,6 +116,15 @@
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space>
+              <a-button
+                v-if="record.available === 0"
+                type="link"
+                size="small"
+                class="table-action-btn reserve-btn"
+                @click="showReserveModal(record)"
+              >
+                <ScheduleOutlined /> 预约
+              </a-button>
               <a-button type="link" size="small" class="table-action-btn edit-btn" @click="showEditModal(record)">
                 <EditOutlined /> 编辑
               </a-button>
@@ -200,18 +209,65 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <!-- 预约弹窗 -->
+    <a-modal
+      v-model:open="reserveModalVisible"
+      title="图书预约"
+      :confirm-loading="reserveSubmitLoading"
+      @ok="handleReserveSubmit"
+      @cancel="handleReserveModalClose"
+      width="500px"
+    >
+      <a-alert
+        v-if="reservingBook"
+        type="warning"
+        show-icon
+        :message="`《${reservingBook.title}》已全部借出，可为读者预约排队，归还后自动借出`"
+        style="margin-bottom: 16px;"
+      />
+      <a-form
+        ref="reserveFormRef"
+        :model="reserveForm"
+        :rules="reserveRules"
+        :label-col="{ span: 5 }"
+        :wrapper-col="{ span: 18 }"
+      >
+        <a-form-item label="读者" name="readerId">
+          <a-select
+            v-model:value="reserveForm.readerId"
+            placeholder="请选择读者"
+            show-search
+            :filter-option="filterReader"
+          >
+            <a-select-option
+              v-for="reader in availableReaders"
+              :key="reader.id"
+              :value="reader.id"
+              :label="reader.name"
+            >
+              {{ reader.name }} ({{ reader.cardNo }})
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, nextTick, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EyeOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EyeOutlined, ScheduleOutlined } from '@ant-design/icons-vue'
 import { useBookStore } from '@/stores/book'
 import { useCategoryStore } from '@/stores/category'
+import { useReaderStore } from '@/stores/reader'
+import { useReservationStore } from '@/stores/reservation'
 
 const bookStore = useBookStore()
 const categoryStore = useCategoryStore()
+const readerStore = useReaderStore()
+const reservationStore = useReservationStore()
 
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -225,6 +281,20 @@ const isSearching = ref(false)
 const tableAnimating = ref(false)
 let searchTimeout = null
 
+// 预约相关状态
+const reserveModalVisible = ref(false)
+const reserveSubmitLoading = ref(false)
+const reserveFormRef = ref(null)
+const reservingBookId = ref(null)
+
+const reserveForm = reactive({
+  readerId: null
+})
+
+const reserveRules = {
+  readerId: [{ required: true, message: '请选择读者' }]
+}
+
 const columns = [
   { title: '图书信息', key: 'book', width: 280 },
   { title: '作者', dataIndex: 'author', key: 'author', width: 120 },
@@ -233,7 +303,7 @@ const columns = [
   { title: '价格', dataIndex: 'price', key: 'price', width: 80 },
   { title: '库存', key: 'stock', width: 80 },
   { title: '位置', dataIndex: 'location', key: 'location', width: 100 },
-  { title: '操作', key: 'action', width: 150, fixed: 'right' }
+  { title: '操作', key: 'action', width: 210, fixed: 'right' }
 ]
 
 const formState = reactive({
@@ -271,6 +341,15 @@ const filteredBooks = computed(() => {
   }
 
   return result
+})
+
+const availableReaders = computed(() => {
+  return readerStore.readers.filter(r => r.status === 'active')
+})
+
+const reservingBook = computed(() => {
+  if (!reservingBookId.value) return null
+  return bookStore.getBookById(reservingBookId.value)
 })
 
 function handleSearch() {
@@ -435,6 +514,68 @@ async function handleSubmit() {
 function handleDelete(id) {
   bookStore.deleteBook(id)
   message.success('图书删除成功')
+}
+
+function filterReader(input, option) {
+  return option.label.toLowerCase().includes(input.toLowerCase())
+}
+
+function showReserveModal(record) {
+  reservingBookId.value = record.id
+  reserveForm.readerId = null
+  reserveModalVisible.value = true
+  nextTick(() => {
+    reserveFormRef.value?.clearValidate()
+  })
+}
+
+function handleReserveModalClose() {
+  nextTick(() => {
+    reserveFormRef.value?.resetFields()
+  })
+}
+
+async function handleReserveSubmit() {
+  try {
+    await reserveFormRef.value.validate()
+    reserveSubmitLoading.value = true
+
+    const reader = readerStore.getReaderById(reserveForm.readerId)
+    const book = bookStore.getBookById(reservingBookId.value)
+
+    if (!reader || !book) {
+      message.error('读者或图书信息不存在')
+      return
+    }
+
+    if (book.available > 0) {
+      message.warning('该图书尚有库存，可直接借阅，无需预约')
+      return
+    }
+
+    if (reservationStore.hasWaitingReservation(book.id, reader.id)) {
+      message.warning('该读者已预约此图书，请勿重复预约')
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    reservationStore.addReservation({
+      readerId: reader.id,
+      readerName: reader.name,
+      cardNo: reader.cardNo,
+      bookId: book.id,
+      bookTitle: book.title,
+      isbn: book.isbn
+    })
+
+    message.success('预约成功，已加入排队')
+    reserveModalVisible.value = false
+  } catch (error) {
+    console.error('表单验证失败:', error)
+  } finally {
+    reserveSubmitLoading.value = false
+  }
 }
 </script>
 
@@ -732,6 +873,11 @@ function handleDelete(id) {
     &.edit-btn:hover {
       color: #1890ff;
       background: #e6f7ff;
+    }
+
+    &.reserve-btn:hover {
+      color: #faad14;
+      background: #fffbe6;
     }
 
     &.delete-btn:hover {
