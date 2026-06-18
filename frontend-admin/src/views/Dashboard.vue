@@ -52,6 +52,18 @@
           <div class="stat-card-bg"></div>
         </div>
       </a-col>
+      <a-col :xs="24" :sm="12" :lg="6">
+        <div class="stat-card info animate-slide-up" style="animation-delay: 0.5s">
+          <div class="stat-icon pulse-animation">
+            <ClockCircleOutlined />
+          </div>
+          <div class="stat-info">
+            <div class="stat-value count-up">{{ reservationStore.activeReservations }}</div>
+            <div class="stat-label">预约等待</div>
+          </div>
+          <div class="stat-card-bg"></div>
+        </div>
+      </a-col>
     </a-row>
 
     <!-- 借阅记录和分类统计 -->
@@ -187,6 +199,7 @@ import {
   UserOutlined,
   SwapOutlined,
   WarningOutlined,
+  ClockCircleOutlined,
   HistoryOutlined,
   RightOutlined,
   PieChartOutlined,
@@ -196,11 +209,13 @@ import { useBookStore } from '@/stores/book'
 import { useReaderStore } from '@/stores/reader'
 import { useBorrowStore } from '@/stores/borrow'
 import { useCategoryStore } from '@/stores/category'
+import { useReservationStore } from '@/stores/reservation'
 
 const bookStore = useBookStore()
 const readerStore = useReaderStore()
 const borrowStore = useBorrowStore()
 const categoryStore = useCategoryStore()
+const reservationStore = useReservationStore()
 
 const recentBorrows = computed(() => {
   return [...borrowStore.records]
@@ -380,6 +395,15 @@ function getProgressColor(id) {
 
     &:hover {
       box-shadow: 0 12px 32px rgba(255, 77, 79, 0.4);
+    }
+  }
+
+  &.info {
+    background: linear-gradient(135deg, #722ed1 0%, #9254de 100%);
+    box-shadow: 0 2px 8px rgba(114, 46, 209, 0.15);
+
+    &:hover {
+      box-shadow: 0 12px 32px rgba(114, 46, 209, 0.4);
     }
   }
 
