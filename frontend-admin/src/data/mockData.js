@@ -340,6 +340,48 @@ export const borrowRecords = [
 ]
 
 // ========================================
+// 预约记录数据
+// ========================================
+export const reservations = [
+  {
+    id: 1,
+    readerId: 3,
+    readerName: '王五',
+    cardNo: 'R202301003',
+    bookId: 4,
+    bookTitle: 'Vue.js设计与实现',
+    isbn: '978-7-115-52808-3',
+    reserveDate: '2024-01-18',
+    status: 'waiting',
+    fulfilledDate: null
+  },
+  {
+    id: 2,
+    readerId: 5,
+    readerName: '钱七',
+    cardNo: 'R202301005',
+    bookId: 4,
+    bookTitle: 'Vue.js设计与实现',
+    isbn: '978-7-115-52808-3',
+    reserveDate: '2024-01-20',
+    status: 'waiting',
+    fulfilledDate: null
+  },
+  {
+    id: 3,
+    readerId: 3,
+    readerName: '王五',
+    cardNo: 'R202301003',
+    bookId: 2,
+    bookTitle: 'JavaScript高级程序设计',
+    isbn: '978-7-111-40701-0',
+    reserveDate: '2024-01-11',
+    status: 'fulfilled',
+    fulfilledDate: '2024-01-15'
+  }
+]
+
+// ========================================
 // 测试用户账号
 // ========================================
 export const users = [
