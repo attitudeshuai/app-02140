@@ -112,10 +112,22 @@
                   }"
                 ></div>
               </div>
+              <div v-if="getReservationCount(record.id) > 0" class="reservation-info">
+                <ClockCircleOutlined class="reservation-icon" />
+                <span>{{ getReservationCount(record.id) }} 人预约</span>
+              </div>
             </div>
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space>
+              <a-button 
+                type="link" 
+                size="small" 
+                class="table-action-btn reserve-btn" 
+                @click="showReserveModal(record)"
+              >
+                <ClockCircleOutlined /> 预约
+              </a-button>
               <a-button type="link" size="small" class="table-action-btn edit-btn" @click="showEditModal(record)">
                 <EditOutlined /> 编辑
               </a-button>
@@ -134,6 +146,45 @@
         </template>
       </a-table>
     </div>
+
+    <!-- 预约弹窗 -->
+    <a-modal
+      v-model:open="reserveModalVisible"
+      title="预约图书"
+      :confirm-loading="reserveSubmitLoading"
+      @ok="handleReserveSubmit"
+      @cancel="handleReserveModalClose"
+      width="500px"
+    >
+      <a-form
+        ref="reserveFormRef"
+        :model="reserveForm"
+        :rules="reserveRules"
+        :label-col="{ span: 5 }"
+        :wrapper-col="{ span: 18 }"
+      >
+        <a-form-item label="图书">
+          <span class="reserve-book-title">{{ currentReserveBook?.title }}</span>
+        </a-form-item>
+        <a-form-item label="读者" name="readerId">
+          <a-select
+            v-model:value="reserveForm.readerId"
+            placeholder="请选择读者"
+            show-search
+            :filter-option="filterReaderForReserve"
+          >
+            <a-select-option
+              v-for="reader in availableReadersForReserve"
+              :key="reader.id"
+              :value="reader.id"
+              :label="reader.name"
+            >
+              {{ reader.name }} ({{ reader.cardNo }})
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+    </a-modal>
 
     <!-- 新增/编辑弹窗 -->
     <a-modal
@@ -206,12 +257,16 @@
 <script setup>
 import { ref, reactive, computed, nextTick, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EyeOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EyeOutlined, ClockCircleOutlined } from '@ant-design/icons-vue'
 import { useBookStore } from '@/stores/book'
 import { useCategoryStore } from '@/stores/category'
+import { useReservationStore } from '@/stores/reservation'
+import { useReaderStore } from '@/stores/reader'
 
 const bookStore = useBookStore()
 const categoryStore = useCategoryStore()
+const reservationStore = useReservationStore()
+const readerStore = useReaderStore()
 
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -223,7 +278,19 @@ const editingId = ref(null)
 const formRef = ref(null)
 const isSearching = ref(false)
 const tableAnimating = ref(false)
+const reserveModalVisible = ref(false)
+const reserveSubmitLoading = ref(false)
+const reservingBookId = ref(null)
+const reserveFormRef = ref(null)
 let searchTimeout = null
+
+const reserveForm = reactive({
+  readerId: null
+})
+
+const reserveRules = {
+  readerId: [{ required: true, message: '请选择读者' }]
+}
 
 const columns = [
   { title: '图书信息', key: 'book', width: 280 },
@@ -231,10 +298,82 @@ const columns = [
   { title: '分类', key: 'category', width: 100 },
   { title: '出版社', dataIndex: 'publisher', key: 'publisher', ellipsis: true },
   { title: '价格', dataIndex: 'price', key: 'price', width: 80 },
-  { title: '库存', key: 'stock', width: 80 },
+  { title: '库存/预约', key: 'stock', width: 120 },
   { title: '位置', dataIndex: 'location', key: 'location', width: 100 },
-  { title: '操作', key: 'action', width: 150, fixed: 'right' }
+  { title: '操作', key: 'action', width: 200, fixed: 'right' }
 ]
+
+const availableReadersForReserve = computed(() => {
+  return readerStore.readers.filter(r => r.status === 'active')
+})
+
+const currentReserveBook = computed(() => {
+  if (reservingBookId.value) {
+    return bookStore.getBookById(reservingBookId.value)
+  }
+  return null
+})
+
+function getReservationCount(bookId) {
+  return reservationStore.getReservationsByBook(bookId).length
+}
+
+function filterReaderForReserve(input, option) {
+  return option.label.toLowerCase().includes(input.toLowerCase())
+}
+
+function showReserveModal(book) {
+  reservingBookId.value = book.id
+  reserveForm.readerId = null
+  reserveModalVisible.value = true
+  nextTick(() => {
+    reserveFormRef.value?.clearValidate()
+  })
+}
+
+function handleReserveModalClose() {
+  nextTick(() => {
+    reserveFormRef.value?.resetFields()
+  })
+}
+
+async function handleReserveSubmit() {
+  try {
+    await reserveFormRef.value.validate()
+    reserveSubmitLoading.value = true
+
+    const reader = readerStore.getReaderById(reserveForm.readerId)
+    const book = bookStore.getBookById(reservingBookId.value)
+
+    if (!reader || !book) {
+      message.error('读者或图书信息不存在')
+      return
+    }
+
+    if (reservationStore.hasReservation(book.id, reader.id)) {
+      message.error('该读者已预约过此书')
+      return
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    reservationStore.addReservation({
+      readerId: reader.id,
+      readerName: reader.name,
+      cardNo: reader.cardNo,
+      bookId: book.id,
+      bookTitle: book.title,
+      isbn: book.isbn
+    })
+
+    message.success('预约成功')
+    reserveModalVisible.value = false
+  } catch (error) {
+    console.error('表单验证失败:', error)
+  } finally {
+    reserveSubmitLoading.value = false
+  }
+}
 
 const formState = reactive({
   isbn: '',
@@ -729,6 +868,11 @@ function handleDelete(id) {
     border-radius: 4px;
     transition: all 0.2s ease;
 
+    &.reserve-btn:hover {
+      color: #faad14;
+      background: #fffbe6;
+    }
+
     &.edit-btn:hover {
       color: #1890ff;
       background: #e6f7ff;
@@ -739,6 +883,11 @@ function handleDelete(id) {
       background: #fff1f0;
     }
   }
+}
+
+.reserve-book-title {
+  font-weight: 500;
+  color: #1a1a1a;
 }
 
 .book-cell {
@@ -793,10 +942,23 @@ function handleDelete(id) {
     background: #f0f0f0;
     border-radius: 2px;
     overflow: hidden;
+    margin-bottom: 6px;
     
     .stock-bar-fill {
       height: 100%;
       border-radius: 2px;
+    }
+  }
+
+  .reservation-info {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #faad14;
+
+    .reservation-icon {
+      font-size: 12px;
     }
   }
 }
